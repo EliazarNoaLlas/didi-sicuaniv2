@@ -22,7 +22,12 @@ export const obtenerHistorialPasajero = async (req, res) => {
         error: 'Usuario no autenticado',
       });
     }
-    const { estado, fechaInicio, fechaFin, precioMinimo, precioMaximo } = req.query;
+    // Aceptar parámetros en español e inglés
+    const estado = req.query.estado || req.query.status;
+    const fechaInicio = req.query.fechaInicio || req.query.startDate;
+    const fechaFin = req.query.fechaFin || req.query.endDate;
+    const precioMinimo = req.query.precioMinimo || req.query.minPrice;
+    const precioMaximo = req.query.precioMaximo || req.query.maxPrice;
 
     // Construir filtros
     const filtros = { id_pasajero: idPasajero };
@@ -134,13 +139,26 @@ export const obtenerHistorialConductor = async (req, res) => {
         error: 'Usuario no autenticado',
       });
     }
-    const { estado, fechaInicio, fechaFin, precioMinimo, precioMaximo } = req.query;
+    // Aceptar parámetros en español e inglés
+    const estado = req.query.estado || req.query.status;
+    const fechaInicio = req.query.fechaInicio || req.query.startDate;
+    const fechaFin = req.query.fechaFin || req.query.endDate;
+    const precioMinimo = req.query.precioMinimo || req.query.minPrice;
+    const precioMaximo = req.query.precioMaximo || req.query.maxPrice;
+    
+    // Mapear estados en inglés a español si es necesario
+    const estadoMapeado = estado === 'completed' ? 'completado' :
+                         estado === 'cancelled' ? 'cancelado' :
+                         estado === 'matched' ? 'asignado' :
+                         estado === 'in_progress' ? 'en_progreso' :
+                         estado === 'driver_en_route' ? 'conductor_en_ruta' :
+                         estado;
 
     // Obtener viajes asignados al conductor (excluir eliminados)
     const viajesAsignados = await SolicitudViaje.find({
       id_conductor_asignado: idConductor,
       fecha_eliminacion: null, // Excluir viajes eliminados
-      ...(estado && { estado }),
+      ...(estadoMapeado && { estado: estadoMapeado }),
       ...(fechaInicio || fechaFin
         ? {
             createdAt: {
@@ -360,7 +378,10 @@ export const eliminarHistorialConductor = async (req, res) => {
       });
     }
     
-    const { idsViajes, borrarTodo, borrarOfertas } = req.body;
+    // Aceptar parámetros en español e inglés
+    const idsViajes = req.body.idsViajes || req.body.rideIds;
+    const borrarTodo = req.body.borrarTodo || req.body.deleteAll;
+    const borrarOfertas = req.body.borrarOfertas || req.body.deleteBids;
 
     // Validar que sea conductor
     const tipoUsuario = usuario.tipoUsuario || usuario.userType;
@@ -442,5 +463,6 @@ export const getPassengerHistory = obtenerHistorialPasajero;
 export const getDriverHistory = obtenerHistorialConductor;
 export const deletePassengerHistory = eliminarHistorialPasajero;
 export const deleteDriverHistory = eliminarHistorialConductor;
+export const borrarHistorialConductor = eliminarHistorialConductor; // Alias en español
 
 

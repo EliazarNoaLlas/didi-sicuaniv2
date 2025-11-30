@@ -1,5 +1,5 @@
 import Rating from '../models/Calificacion.js';
-import RideRequest from '../models/SolicitudViaje.js';
+import SolicitudViaje from '../models/SolicitudViaje.js';
 import User from '../models/Usuario.js';
 import { io } from '../server.js';
 
@@ -8,12 +8,12 @@ import { io } from '../server.js';
  */
 export const calificarConductor = async (req, res) => {
   try {
-    const idPasajero = req.user.id;
+    const idPasajero = req.usuario?.id || req.user?.id;
     const { idViaje } = req.params;
     const { calificacion, comentario } = req.body;
 
     // Validar que el usuario sea un cliente
-    const tipoUsuario = req.user.tipoUsuario || req.user.userType;
+    const tipoUsuario = req.usuario?.tipoUsuario || req.user?.tipoUsuario || req.user?.userType;
     if (tipoUsuario !== 'pasajero' && tipoUsuario !== 'passenger') {
       return res.status(403).json({
         exito: false,
@@ -30,7 +30,7 @@ export const calificarConductor = async (req, res) => {
     }
 
     // Obtener el viaje
-    const viaje = await RideRequest.findById(idViaje);
+    const viaje = await SolicitudViaje.findById(idViaje);
 
     if (!viaje) {
       return res.status(404).json({
@@ -47,12 +47,64 @@ export const calificarConductor = async (req, res) => {
       });
     }
 
-    // Validar que el viaje esté completado
-    if (viaje.estado !== 'completado') {
+    // Validar que el viaje esté completado o pueda ser considerado completado
+    const estadoCompletado = viaje.estado === 'completado' || viaje.estado === 'completed';
+    const estadoEnProgreso = viaje.estado === 'en_progreso' || viaje.estado === 'in_progress';
+    const estadoAsignado = viaje.estado === 'asignado' || viaje.estado === 'assigned';
+    const estadoConductorEnRuta = viaje.estado === 'conductor_en_ruta' || viaje.estado === 'driver_en_route';
+    const estadoConductorLlego = viaje.estado === 'conductor_llego_punto_recogida' || viaje.estado === 'driver_arrived';
+    
+    // Calcular tiempo desde la asignación
+    const fechaAsignacion = viaje.fecha_asignacion || viaje.createdAt;
+    const tiempoDesdeAsignacion = fechaAsignacion ? (new Date() - new Date(fechaAsignacion)) / (1000 * 60 * 60) : 0; // en horas
+    const esViajeAntiguo = tiempoDesdeAsignacion > 1; // Más de 1 hora
+    
+    // Permitir calificar si:
+    // 1. Está completado
+    // 2. Está en progreso
+    // 3. Está en cualquier estado intermedio pero tiene más de 1 hora (considerarlo completado implícitamente)
+    const puedeCalificar = estadoCompletado || estadoEnProgreso || 
+                          (estadoAsignado && esViajeAntiguo) ||
+                          (estadoConductorEnRuta && esViajeAntiguo) ||
+                          (estadoConductorLlego && esViajeAntiguo);
+    
+    if (!puedeCalificar) {
+      console.log(`⚠️ Intento de calificar viaje ${idViaje} con estado: ${viaje.estado}, tiempo desde asignación: ${tiempoDesdeAsignacion.toFixed(2)} horas`);
       return res.status(400).json({
         exito: false,
-        error: 'Solo se pueden calificar viajes completados',
+        error: `Solo se pueden calificar viajes completados. Estado actual: ${viaje.estado}. El viaje debe estar completado o tener más de 1 hora desde su asignación.`,
+        estadoActual: viaje.estado,
+        tiempoDesdeAsignacion: tiempoDesdeAsignacion.toFixed(2),
       });
+    }
+    
+    // Si el viaje no está en 'completado' pero puede ser calificado, actualizarlo automáticamente
+    let viajeFinal = viaje;
+    if (!estadoCompletado && puedeCalificar) {
+      console.log(`🔄 Actualizando automáticamente el viaje ${idViaje} de '${viaje.estado}' a 'completado'...`);
+      try {
+        viajeFinal = await SolicitudViaje.findByIdAndUpdate(
+          idViaje,
+          { estado: 'completado' },
+          { new: true }
+        );
+        
+        if (viajeFinal && viajeFinal.estado === 'completado') {
+          console.log(`✅ Viaje ${idViaje} actualizado automáticamente a completado`);
+          
+          // Si el conductor estaba asignado, marcarlo como disponible
+          if (viajeFinal.id_conductor_asignado) {
+            await User.findByIdAndUpdate(viajeFinal.id_conductor_asignado, {
+              'informacion_conductor.esta_disponible': true,
+            });
+          }
+        } else {
+          console.warn(`⚠️ No se pudo actualizar el viaje ${idViaje}, continuando con el estado actual`);
+        }
+      } catch (error) {
+        console.error(`❌ Error actualizando viaje automáticamente:`, error);
+        // Continuar con el viaje original si falla la actualización
+      }
     }
 
     // Validar que no haya sido calificado previamente
@@ -68,8 +120,9 @@ export const calificarConductor = async (req, res) => {
       });
     }
 
-    // Validar que haya un conductor asignado
-    if (!viaje.id_conductor_asignado) {
+    // Validar que haya un conductor asignado (usar viajeFinal después de la actualización)
+    const viajeParaCalificar = viajeFinal || viaje;
+    if (!viajeParaCalificar.id_conductor_asignado) {
       return res.status(400).json({
         exito: false,
         error: 'Este viaje no tiene conductor asignado',
@@ -80,18 +133,18 @@ export const calificarConductor = async (req, res) => {
     const nuevaCalificacion = await Rating.create({
       id_viaje: idViaje,
       id_calificador: idPasajero,
-      id_calificado: viaje.id_conductor_asignado,
+      id_calificado: viajeParaCalificar.id_conductor_asignado,
       calificacion,
       comentario: comentario || '',
       tipo_calificador: 'pasajero',
     });
 
     // Actualizar el rating del conductor
-    await actualizarCalificacionConductor(viaje.id_conductor_asignado);
+    await actualizarCalificacionConductor(viajeParaCalificar.id_conductor_asignado);
 
     // Notificar al conductor
     if (io) {
-      io.to(`user:${viaje.id_conductor_asignado}`).emit('rating:received', {
+      io.to(`usuario:${viajeParaCalificar.id_conductor_asignado}`).emit('rating:received', {
         rideId: idViaje,
         rating: calificacion,
         comment: comentario,
@@ -118,12 +171,12 @@ export const calificarConductor = async (req, res) => {
  */
 export const calificarPasajero = async (req, res) => {
   try {
-    const idConductor = req.user.id;
+    const idConductor = req.usuario?.id || req.user?.id;
     const { idViaje } = req.params;
     const { calificacion, comentario } = req.body;
 
     // Validar que el usuario sea un conductor
-    const tipoUsuario = req.user.tipoUsuario || req.user.userType;
+    const tipoUsuario = req.usuario?.tipoUsuario || req.user?.tipoUsuario || req.user?.userType;
     if (tipoUsuario !== 'conductor' && tipoUsuario !== 'driver') {
       return res.status(403).json({
         exito: false,
@@ -140,7 +193,7 @@ export const calificarPasajero = async (req, res) => {
     }
 
     // Obtener el viaje
-    const viaje = await RideRequest.findById(idViaje);
+    const viaje = await SolicitudViaje.findById(idViaje);
 
     if (!viaje) {
       return res.status(404).json({

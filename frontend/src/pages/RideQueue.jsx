@@ -613,4 +613,60 @@ export default function RideQueue() {
               <h3 className="font-semibold mb-2">Detalles del Viaje</h3>
               <p><strong>Origen:</strong> {selectedRide.origen?.direccion || selectedRide.origin?.address}</p>
               <p><strong>Destino:</strong> {selectedRide.destino?.direccion || selectedRide.destination?.address}</p>
-              <p><strong>Precio Sugerid
+              <p><strong>Precio Sugerido:</strong> S/ {selectedRide.precios?.precio_sugerido || selectedRide.pricing?.suggested_price}</p>
+            </div>
+
+            {loadingOffers ? (
+              <div className="text-center py-8">
+                <p>Cargando ofertas...</p>
+              </div>
+            ) : selectedRideOffers.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>No hay ofertas para este viaje aún.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {selectedRideOffers.map((oferta, index) => (
+                  <div key={index} className="border p-4 rounded-lg flex justify-between items-center bg-white shadow-sm">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">{oferta.nombre_conductor || 'Conductor'}</span>
+                        <span className="text-yellow-500 text-sm">⭐ {oferta.calificacion || '5.0'}</span>
+                      </div>
+                      <div className="text-sm text-gray-600 mt-1">
+                        <span className="mr-3">🚗 {oferta.tipo_vehiculo === 'taxi' ? 'Taxi' : 'Vehículo'}</span>
+                        <span>🕒 {oferta.tiempo_estimado_llegada_min || '?'} min</span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xl font-bold text-green-600">
+                        S/ {typeof oferta.precio_ofrecido === 'number' ? oferta.precio_ofrecido.toFixed(2) : oferta.precio_ofrecido}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-1">
+                        {new Date(oferta.fecha_creacion || oferta.createdAt).toLocaleTimeString()}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => {
+                  setShowOffersModal(false);
+                  setSelectedRide(null);
+                  setSelectedRideOffers([]);
+                }}
+                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+

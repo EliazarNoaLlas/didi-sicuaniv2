@@ -4,6 +4,7 @@ import { autenticar } from '../middleware/middleware-autenticacion.js';
 import servicioSubasta from '../services/servicio-subasta.js';
 import servicioPrecios from '../services/servicio-precios.js';
 import utilidadesGeoespaciales from '../utils/utilidades-geoespaciales.js';
+import { obtenerViajeActivoPasajero } from '../controllers/controlador-estado-viaje.js';
 
 const enrutador = express.Router();
 
@@ -256,6 +257,22 @@ enrutador.post(
     }
   }
 );
+
+/**
+ * @swagger
+ * /api/viajes/activo:
+ *   get:
+ *     summary: Obtener viaje activo del pasajero
+ *     tags: [Viajes]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Viaje activo del pasajero
+ *       404:
+ *         description: No hay viaje activo
+ */
+enrutador.get('/activo', autenticar, obtenerViajeActivoPasajero);
 
 /**
  * @swagger

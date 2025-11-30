@@ -1,6 +1,7 @@
 import express from 'express';
 import { autenticar } from '../middleware/middleware-autenticacion.js';
 import { obtenerHistorialPasajero } from '../controllers/controlador-historial.js';
+import { obtenerMejoresConductores } from '../controllers/controlador-mejores-conductores.js';
 import { obtenerEstadisticasPasajero } from '../controllers/controlador-estadisticas.js';
 
 const enrutador = express.Router();
@@ -78,6 +79,20 @@ enrutador.get('/history', obtenerHistorialPasajero);
  *         description: Estadísticas del cliente
  */
 enrutador.get('/stats', obtenerEstadisticasPasajero);
+
+/**
+ * @swagger
+ * /api/usuarios/mejores-conductores:
+ *   get:
+ *     summary: Obtener mejores conductores del pasajero
+ *     tags: [Usuarios]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lista de mejores conductores
+ */
+enrutador.get('/mejores-conductores', obtenerMejoresConductores);
 
 /**
  * @swagger

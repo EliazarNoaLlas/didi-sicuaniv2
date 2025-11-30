@@ -12,8 +12,11 @@ import RideQueue from './pages/RideQueue';
 import BiddingPage from './pages/BiddingPage';
 import Metrics from './pages/Metrics';
 import ActiveRide from './pages/ActiveRide';
+import PassengerActiveRide from './pages/PassengerActiveRide';
 import DriverHistory from './pages/DriverHistory';
 import PassengerHistory from './pages/PassengerHistory';
+import DriverRatings from './pages/DriverRatings';
+import BestDrivers from './pages/BestDrivers';
 
 function RutaPrivada({ children }) {
   const { isAuthenticated } = useAuthStore();
@@ -43,8 +46,11 @@ function App() {
         <Route path="subasta/:rideId" element={<BiddingPage />} />
         <Route path="metricas" element={<Metrics />} />
         <Route path="viaje-activo" element={<ActiveRide />} />
+        <Route path="viaje-activo-pasajero" element={<PassengerActiveRide />} />
         <Route path="historial" element={<DriverHistory />} />
         <Route path="historial-pasajero" element={<PassengerHistory />} />
+        <Route path="calificaciones" element={<DriverRatings />} />
+        <Route path="mejores-conductores" element={<BestDrivers />} />
       </Route>
     </Routes>
   );

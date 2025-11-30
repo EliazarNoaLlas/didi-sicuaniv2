@@ -82,14 +82,12 @@ export default function DriverDashboard() {
         </Link>
 
         <Link
-          to="/earnings"
+          to="/calificaciones"
           className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition"
         >
-          <h2 className="text-xl font-semibold mb-2">💰 Ganancias</h2>
-          <p className="text-gray-600">Ver tus ganancias</p>
+          <h2 className="text-xl font-semibold mb-2">⭐ Calificaciones</h2>
+          <p className="text-gray-600">Ver tus reseñas y calificaciones</p>
         </Link>
-
-      
       </div>
     </div>
   );

@@ -99,6 +99,7 @@ const solicitudViajeSchema = new mongoose.Schema(
         'subasta_activa',
         'asignado',
         'conductor_en_ruta', // Conductor yendo al pasajero
+        'conductor_llego_punto_recogida', // Conductor llegó al punto de recogida
         'en_progreso', // Conductor recogió al pasajero, en camino al destino
         'completado',
         'cancelado',

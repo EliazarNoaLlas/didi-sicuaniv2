@@ -7,6 +7,8 @@ import { useNavigate } from 'react-router-dom';
 export default function ActiveRide() {
   const [activeRide, setActiveRide] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showEtaModal, setShowEtaModal] = useState(false);
+  const [estimatedTime, setEstimatedTime] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -46,10 +48,35 @@ export default function ActiveRide() {
     }
   };
 
-  const handleStartEnRoute = async () => {
+  const handleStartEnRoute = () => {
+    // Mostrar modal para ingresar tiempo estimado
+    setShowEtaModal(true);
+  };
+
+  const handleConfirmEnRoute = async () => {
+    if (!estimatedTime || parseFloat(estimatedTime) <= 0) {
+      toast.error('Por favor ingresa un tiempo estimado válido');
+      return;
+    }
+
     try {
-      await api.post(`/conductores/rides/${activeRide._id}/en-route`);
+      await api.post(`/conductores/rides/${activeRide._id}/en-route`, {
+        tiempo_estimado_minutos: parseFloat(estimatedTime),
+      });
       toast.success('✅ Estado actualizado: En camino al punto de recogida');
+      setShowEtaModal(false);
+      setEstimatedTime('');
+      loadActiveRide();
+    } catch (error) {
+      const mensajeError = error.response?.data?.error || error.response?.data?.mensaje || 'Error al actualizar estado';
+      toast.error(mensajeError);
+    }
+  };
+
+  const handleDriverArrived = async () => {
+    try {
+      await api.post(`/conductores/rides/${activeRide._id}/arrived`);
+      toast.success('✅ Estado actualizado: Llegaste al punto de recogida');
       loadActiveRide();
     } catch (error) {
       const mensajeError = error.response?.data?.error || error.response?.data?.mensaje || 'Error al actualizar estado';
@@ -74,8 +101,16 @@ export default function ActiveRide() {
     }
 
     try {
-      await api.post(`/conductores/rides/${activeRide._id}/complete`);
+      const respuesta = await api.post(`/conductores/rides/${activeRide._id}/complete`);
       toast.success('🎉 Viaje completado exitosamente');
+      
+      // Verificar que el estado se haya actualizado correctamente
+      if (respuesta.data?.datos?.estado === 'completado' || respuesta.data?.datos?.viaje?.estado === 'completado') {
+        console.log('✅ Estado del viaje actualizado a completado correctamente');
+      } else {
+        console.warn('⚠️ El viaje se completó pero el estado puede no haberse actualizado correctamente');
+      }
+      
       setActiveRide(null);
       navigate('/conductor');
     } catch (error) {
@@ -120,6 +155,7 @@ export default function ActiveRide() {
       'matched': 'asignado',
       'conductor_en_ruta': 'conductor_en_ruta',
       'driver_en_route': 'conductor_en_ruta',
+      'conductor_llego_punto_recogida': 'conductor_llego_punto_recogida',
       'en_progreso': 'en_progreso',
       'in_progress': 'en_progreso',
     };
@@ -129,6 +165,7 @@ export default function ActiveRide() {
     const badges = {
       asignado: { text: 'Asignado', color: 'bg-blue-100 text-blue-800' },
       conductor_en_ruta: { text: 'En camino al pasajero', color: 'bg-yellow-100 text-yellow-800' },
+      conductor_llego_punto_recogida: { text: 'Llegaste al punto de recogida', color: 'bg-orange-100 text-orange-800' },
       en_progreso: { text: 'En viaje', color: 'bg-green-100 text-green-800' },
     };
     const badge = badges[estadoNormalizado] || { text: status, color: 'bg-gray-100 text-gray-800' };
@@ -225,6 +262,15 @@ export default function ActiveRide() {
           </div>
         )}
 
+        {/* Notificación cuando el conductor llegó */}
+        {(activeRide.estado === 'conductor_llego_punto_recogida') && (
+          <div className="bg-orange-50 border border-orange-200 p-4 rounded-lg mb-4">
+            <p className="text-orange-800">
+              📍 <strong>Llegaste al punto de recogida:</strong> Espera a que el pasajero aborde el vehículo.
+            </p>
+          </div>
+        )}
+
         {/* Botones de Acción */}
         <div className="flex gap-3">
           {(activeRide.estado === 'asignado' || activeRide.status === 'matched') && (
@@ -238,12 +284,66 @@ export default function ActiveRide() {
 
           {(activeRide.estado === 'conductor_en_ruta' || activeRide.status === 'driver_en_route') && (
             <button
+              onClick={handleDriverArrived}
+              className="flex-1 bg-orange-500 text-white px-6 py-3 rounded-lg hover:bg-orange-600 font-medium text-lg"
+            >
+              ✅ Ya llegué al punto de recogida
+            </button>
+          )}
+
+          {(activeRide.estado === 'conductor_llego_punto_recogida') && (
+            <button
               onClick={handleStartTrip}
               className="flex-1 bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 font-medium text-lg"
             >
               ✅ Recogí al pasajero - Iniciar viaje
             </button>
           )}
+
+          {/* Modal para tiempo estimado */}
+          {showEtaModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
+                <h2 className="text-2xl font-bold mb-4">Tiempo Estimado de Llegada</h2>
+                <p className="text-gray-600 mb-4">
+                  ¿Cuántos minutos estimas que tardarás en llegar al punto de recogida?
+                </p>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Tiempo estimado (minutos)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="120"
+                    value={estimatedTime}
+                    onChange={(e) => setEstimatedTime(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Ej: 5"
+                    autoFocus
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleConfirmEnRoute}
+                    className="flex-1 bg-yellow-500 text-white py-2 px-4 rounded-lg hover:bg-yellow-600 font-medium"
+                  >
+                    Confirmar
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowEtaModal(false);
+                      setEstimatedTime('');
+                    }}
+                    className="flex-1 bg-gray-500 text-white py-2 px-4 rounded-lg hover:bg-gray-600 font-medium"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
 
           {(activeRide.estado === 'en_progreso' || activeRide.status === 'in_progress') && (
             <button

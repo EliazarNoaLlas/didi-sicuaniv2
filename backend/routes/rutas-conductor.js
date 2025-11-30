@@ -2,10 +2,12 @@ import express from 'express';
 import { autenticar, autorizar } from '../middleware/middleware-autenticacion.js';
 import { obtenerCola } from '../controllers/controlador-conductor.js';
 import { obtenerHistorialConductor } from '../controllers/controlador-historial.js';
+import { obtenerCalificacionesConductor } from '../controllers/controlador-calificaciones-conductor.js';
 import { obtenerGananciasConductor } from '../controllers/controlador-ganancias.js';
 import { obtenerEstadisticasConductor } from '../controllers/controlador-estadisticas.js';
 import {
   iniciarEnRuta,
+  conductorLlegoPuntoRecogida,
   iniciarViaje,
   completarViaje,
   obtenerViajeActivo,
@@ -145,6 +147,7 @@ enrutador.get('/queue', obtenerCola);
  *         description: Historial de viajes del conductor
  */
 enrutador.get('/history', obtenerHistorialConductor);
+enrutador.get('/historial', obtenerHistorialConductor); // Ruta en español
 
 /**
  * @swagger
@@ -231,6 +234,20 @@ enrutador.get('/stats', obtenerEstadisticasConductor);
 
 /**
  * @swagger
+ * /api/conductores/calificaciones:
+ *   get:
+ *     summary: Obtener calificaciones y reseñas del conductor
+ *     tags: [Conductores]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Calificaciones del conductor
+ */
+enrutador.get('/calificaciones', obtenerCalificacionesConductor);
+
+/**
+ * @swagger
  * /api/conductores/viaje-activo:
  *   get:
  *     summary: Obtener viaje activo del conductor
@@ -262,6 +279,26 @@ enrutador.get('/viaje-activo', obtenerViajeActivo);
  *         description: Estado actualizado
  */
 enrutador.post('/rides/:idViaje/en-route', iniciarEnRuta);
+
+/**
+ * @swagger
+ * /api/conductores/rides/{rideId}/arrived:
+ *   post:
+ *     summary: Conductor indica que llegó al punto de recogida
+ *     tags: [Conductores]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: rideId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Estado actualizado
+ */
+enrutador.post('/rides/:idViaje/arrived', conductorLlegoPuntoRecogida);
 
 /**
  * @swagger
@@ -337,6 +374,10 @@ enrutador.post('/history/delete', async (req, res) => {
   const { borrarHistorialConductor } = await import('../controllers/controlador-historial.js');
   return borrarHistorialConductor(req, res);
 });
+enrutador.post('/historial/eliminar', async (req, res) => {
+  const { borrarHistorialConductor } = await import('../controllers/controlador-historial.js');
+  return borrarHistorialConductor(req, res);
+}); // Ruta en español
 
 /**
  * @swagger
